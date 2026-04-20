@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Bubble Pop"
+version = "1.0.0"
+id = "artifacts/bubble-pop"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24001
+
+[services.development]
+run = "pnpm --filter @workspace/bubble-pop run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bubble-pop", "run", "build" ]
+publicDir = "artifacts/bubble-pop/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24001"
+BASE_PATH = "/"

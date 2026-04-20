@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Bubble Pop!</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    canvas {
+      display: block;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <script>
+  (function () {
+    'use strict';
+
+    const canvas = document.getElementById('c');
+    const ctx    = canvas.getContext('2d');
+
+    /* ── canvas size ──────────────────────────────── */
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    /* ── colour palette ───────────────────────────── */
+    const COLORS = [
+      { h: 355, s: 88, l: 62 },  // coral-red
+      { h:  22, s: 92, l: 58 },  // orange
+      { h:  48, s: 96, l: 58 },  // yellow
+      { h: 132, s: 62, l: 50 },  // green
+      { h: 200, s: 82, l: 58 },  // sky-blue
+      { h: 260, s: 72, l: 65 },  // violet
+      { h: 322, s: 82, l: 62 },  // pink
+      { h: 175, s: 68, l: 50 },  // teal
+    ];
+
+    /* ── state ────────────────────────────────────── */
+    let bubbles   = [];
+    let particles = [];
+    let nextId    = 0;
+
+    /* ── Bubble ───────────────────────────────────── */
+    class Bubble {
+      constructor(scattered) {
+        this.id      = nextId++;
+        this.r       = 26 + Math.random() * 56;
+        this.x       = this.r + Math.random() * Math.max(0, canvas.width  - 2 * this.r);
+        this.y       = scattered
+          ? canvas.height * 0.1 + Math.random() * canvas.height * 0.85
+          : canvas.height + this.r + Math.random() * 100;
+        this.vy      = -(0.7 + Math.random() * 1.5);
+        this.vx      = (Math.random() - 0.5) * 0.35;
+        this.wobble  = Math.random() * Math.PI * 2;
+        this.wSpeed  = 0.016 + Math.random() * 0.014;
+        this.wAmp    = 0.22 + Math.random() * 0.48;
+        this.color   = COLORS[Math.floor(Math.random() * COLORS.length)];
+        this.popping = false;
+        this.popT    = 0;
+        this.opacity = scattered ? 0.2 + Math.random() * 0.55 : 0;
+      }
+
+      update() {
+        if (this.popping) {
+          this.popT += 0.07;
+          return this.popT < 1;
+        }
+        this.opacity  = Math.min(1, this.opacity + 0.022);
+        this.wobble  += this.wSpeed;
+        this.x       += this.vx + Math.sin(this.wobble) * this.wAmp;
+        this.y       += this.vy;
+        if (this.x < this.r)                 { this.x = this.r;                  this.vx =  Math.abs(this.vx); }
+        if (this.x > canvas.width - this.r)  { this.x = canvas.width - this.r;  this.vx = -Math.abs(this.vx); }
+        return this.y + this.r > 0;
+      }
+
+      draw() {
+        const alp = this.popping ? (1 - this.popT) * this.opacity : this.opacity;
+        const r   = this.popping ? this.r * (1 + this.popT * 0.65) : this.r;
+        const { h, s, l } = this.color;
+
+        ctx.save();
+
+        /* translucent body */
+        const body = ctx.createRadialGradient(
+          this.x - r * 0.3, this.y - r * 0.3, r * 0.04,
+          this.x, this.y, r
+        );
+        body.addColorStop(0,   `hsla(${h},${s}%,${l+22}%,${0.12 * alp})`);
+        body.addColorStop(0.5, `hsla(${h},${s}%,${l}%,${0.20 * alp})`);
+        body.addColorStop(1,   `hsla(${h},${s}%,${l-14}%,${0.36 * alp})`);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = body;
+        ctx.fill();
+
+        /* rim */
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${h},${s}%,${l+10}%,${0.70 * alp})`;
+        ctx.lineWidth   = 2;
+        ctx.stroke();
+
+        /* main glint (top-left) */
+        const g1 = ctx.createRadialGradient(
+          this.x - r * 0.32, this.y - r * 0.32, 0,
+          this.x - r * 0.32, this.y - r * 0.32, r * 0.44
+        );
+        g1.addColorStop(0, `rgba(255,255,255,${0.75 * alp})`);
+        g1.addColorStop(1, `rgba(255,255,255,0)`);
+        ctx.beginPath();
+        ctx.arc(this.x - r * 0.32, this.y - r * 0.32, r * 0.44, 0, Math.PI * 2);
+        ctx.fillStyle = g1;
+        ctx.fill();
+
+        /* tiny secondary glint (lower-right) */
+        ctx.beginPath();
+        ctx.arc(this.x + r * 0.33, this.y + r * 0.37, r * 0.10, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.28 * alp})`;
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      pop() {
+        if (!this.popping) {
+          this.popping = true;
+          spawnParticles(this.x, this.y, this.color);
+        }
+      }
+
+      contains(px, py) {
+        const dx = px - this.x, dy = py - this.y;
+        return dx * dx + dy * dy <= this.r * this.r;
+      }
+
+      hitBySegment(ax, ay, bx, by) {
+        const dx = bx - ax, dy = by - ay;
+        const len2 = dx * dx + dy * dy;
+        if (len2 === 0) return this.contains(ax, ay);
+        let t = ((this.x - ax) * dx + (this.y - ay) * dy) / len2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ex = this.x - (ax + t * dx), ey = this.y - (ay + t * dy);
+        return ex * ex + ey * ey <= this.r * this.r;
+      }
+    }
+
+    /* ── Particle ─────────────────────────────────── */
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x; this.y = y;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2.5 + Math.random() * 6;
+        this.vx    = Math.cos(angle) * speed;
+        this.vy    = Math.sin(angle) * speed;
+        this.r     = 3 + Math.random() * 5;
+        this.life  = 1.0;
+        this.decay = 0.026 + Math.random() * 0.026;
+        this.color = color;
+      }
+      update() {
+        this.x += this.vx; this.y += this.vy;
+        this.vy += 0.13;
+        this.vx *= 0.97;
+        this.life -= this.decay;
+        return this.life > 0;
+      }
+      draw() {
+        const { h, s, l } = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${h},${s}%,${l}%,${this.life})`;
+        ctx.fill();
+      }
+    }
+
+    function spawnParticles(x, y, color) {
+      const n = 8 + Math.floor(Math.random() * 8);
+      for (let i = 0; i < n; i++) particles.push(new Particle(x, y, color));
+    }
+
+    /* ── spawner ──────────────────────────────────── */
+    let lastSpawn = 0;
+    const SPAWN_MS  = 1050;
+    const MAX_ALIVE = 24;
+
+    function maybeSpawn(ts) {
+      if (ts - lastSpawn > SPAWN_MS) {
+        if (bubbles.filter(b => !b.popping).length < MAX_ALIVE) {
+          bubbles.push(new Bubble(false));
+        }
+        lastSpawn = ts;
+      }
+    }
+
+    /* ── interaction ──────────────────────────────── */
+    let ptrDown = false;
+    let prevX = 0, prevY = 0;
+
+    function hitPoint(px, py) {
+      for (const b of bubbles) if (!b.popping && b.contains(px, py)) b.pop();
+    }
+
+    function hitSegment(ax, ay, bx, by) {
+      for (const b of bubbles) if (!b.popping && b.hitBySegment(ax, ay, bx, by)) b.pop();
+    }
+
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      ptrDown = true;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        hitPoint(t.clientX, t.clientY);
+      }
+      prevX = e.changedTouches[0].clientX;
+      prevY = e.changedTouches[0].clientY;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const cx = e.changedTouches[0].clientX;
+      const cy = e.changedTouches[0].clientY;
+      hitSegment(prevX, prevY, cx, cy);
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        hitPoint(t.clientX, t.clientY);
+      }
+      prevX = cx; prevY = cy;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend',   e => { e.preventDefault(); ptrDown = false; }, { passive: false });
+    canvas.addEventListener('touchcancel',e => { e.preventDefault(); ptrDown = false; }, { passive: false });
+
+    canvas.addEventListener('mousedown', e => {
+      ptrDown = true; prevX = e.clientX; prevY = e.clientY;
+      hitPoint(e.clientX, e.clientY);
+    });
+    canvas.addEventListener('mousemove', e => {
+      if (!ptrDown) return;
+      hitSegment(prevX, prevY, e.clientX, e.clientY);
+      prevX = e.clientX; prevY = e.clientY;
+    });
+    canvas.addEventListener('mouseup',   () => { ptrDown = false; });
+    canvas.addEventListener('mouseleave',() => { ptrDown = false; });
+
+    /* ── background ───────────────────────────────── */
+    function drawBg() {
+      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      g.addColorStop(0, '#8ecde8');
+      g.addColorStop(1, '#d8f0fc');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    /* ── main loop ────────────────────────────────── */
+    function loop(ts) {
+      maybeSpawn(ts);
+      drawBg();
+      particles = particles.filter(p => { const a = p.update(); if (a) p.draw(); return a; });
+      bubbles   = bubbles.filter(b   => { const a = b.update(); if (a) b.draw(); return a; });
+      requestAnimationFrame(loop);
+    }
+
+    /* seed screen so it's not empty at launch */
+    for (let i = 0; i < 7; i++) bubbles.push(new Bubble(true));
+
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>

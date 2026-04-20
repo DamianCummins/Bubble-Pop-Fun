@@ -25,3 +25,12 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Artifacts
+
+### Bubble Pop (`artifacts/bubble-pop/`)
+- **Kind**: web, served at `/`
+- **Stack**: Pure vanilla HTML + JavaScript, no framework, no build-time dependencies
+- **Entry**: `artifacts/bubble-pop/index.html` — fully self-contained single file
+- **Purpose**: Toddler bubble-popping game; bubbles float up the screen, tap or swipe to pop them
+- **GitHub Pages**: Copy `index.html` to a repo root or `docs/` folder and enable Pages — no build step required
